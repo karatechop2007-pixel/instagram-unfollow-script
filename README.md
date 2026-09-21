@@ -20,6 +20,11 @@ Your login is saved to `session.json` in the folder so you don't have to log in 
 It then shows the list of accounts that don't follow you back and asks
 `Unfollow N account(s)? [y/N]`. Type `y` and it starts.
 
+### If the window flashes and closes
+
+Open the folder, click the address bar at the top of File Explorer, type `cmd` and press Enter.
+In the black window that opens type `run.bat` and press Enter. Now any error message stays on screen.
+
 ## Options
 
 Run from a terminal with extra flags, for example `python unfollow.py --dry-run`:
