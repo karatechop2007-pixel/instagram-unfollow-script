@@ -194,7 +194,6 @@ class InstagramWeb:
             kwargs = dict(
                 user_data_dir=str(self.profile_dir),
                 headless=self.headless,
-                args=["--disable-blink-features=AutomationControlled"],
                 ignore_default_args=["--enable-automation"],
                 chromium_sandbox=(os.geteuid() != 0) if hasattr(os, "geteuid") else True,
                 no_viewport=not self.headless,
@@ -218,6 +217,12 @@ class InstagramWeb:
                 "    venv\\Scripts\\playwright install chromium      (Windows)\n"
                 "    venv/bin/playwright install chromium           (Mac/Linux)"
             )
+        # Plain Chrome reports navigator.webdriver as undefined; Playwright's build sets
+        # it to true. Put it back to normal, without the command-line flag that makes
+        # Chrome/Edge show a yellow "unsupported flag" banner.
+        self.context.add_init_script(
+            "Object.defineProperty(Navigator.prototype, 'webdriver', {get: () => undefined});"
+        )
         self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
         self.page.set_default_timeout(60_000)
 
