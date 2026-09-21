@@ -1,0 +1,5 @@
+# Accounts you never want to unfollow, one username per line (with or without @).
+# Lines starting with # are ignored.
+# Example:
+# @instagram
+# nasa
