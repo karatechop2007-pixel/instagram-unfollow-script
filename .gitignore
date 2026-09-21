@@ -1,0 +1,5 @@
+session.json
+not_following_back.txt
+venv/
+__pycache__/
+.env
