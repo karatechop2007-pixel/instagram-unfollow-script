@@ -136,7 +136,9 @@ class LoginRequired(Exception):
 
 
 class CheckpointRequired(Exception):
-    pass
+    def __init__(self, url=None):
+        super().__init__(url)
+        self.url = url
 
 
 class RateLimited(Exception):
@@ -194,6 +196,7 @@ class InstagramWeb:
                 headless=self.headless,
                 args=["--disable-blink-features=AutomationControlled"],
                 ignore_default_args=["--enable-automation"],
+                chromium_sandbox=(os.geteuid() != 0) if hasattr(os, "geteuid") else True,
                 no_viewport=not self.headless,
                 # only for automated tests behind an intercepting proxy
                 ignore_https_errors=bool(os.environ.get("IG_IGNORE_TLS")),
@@ -273,26 +276,18 @@ class InstagramWeb:
             return False
         return status == 200 and isinstance(data, dict) and data.get("status") == "ok"
 
-    def _wait_for_checkpoint(self):
-        print("\nInstagram wants you to confirm it's you. Complete the check in the "
-              "browser window, then come back here.")
-        self._goto(IG + "/")
+    def _wait_for_checkpoint(self, url=None):
+        print("\nInstagram is showing a security check (for example \"Your email may not be "
+              "secure\"). This happens on logins from a new device, and it is a one-time thing.")
+        print("Complete it in the browser window, then come back here.")
+        target = url if url and url.startswith("http") else IG + (url or "/")
+        try:
+            self._goto(target)
+        except RuntimeError:
+            pass
         input("Press Enter once you've done that... ")
 
-    def ensure_logged_in(self):
-        self._goto(IG + "/")
-        while self._has_session_cookies():
-            try:
-                valid = self._session_is_valid()
-            except CheckpointRequired:
-                self._wait_for_checkpoint()
-                continue
-            if valid:
-                self._fetch_username()
-                return
-            break
-
-        # Stale or no session: start clean and let the user log in on the real page.
+    def _wait_for_login_cookies(self):
         self.context.clear_cookies()
         self._goto(IG + "/accounts/login/")
         print()
@@ -301,8 +296,22 @@ class InstagramWeb:
                 self._check_open()
                 time.sleep(1)
         time.sleep(2)  # let the post-login redirect settle
-        self.user_id = self._cookie("ds_user_id")
-        self._fetch_username()
+
+    def ensure_logged_in(self):
+        self._goto(IG + "/")
+        if not self._has_session_cookies():
+            self._wait_for_login_cookies()
+        while True:
+            try:
+                valid = self._session_is_valid()
+            except CheckpointRequired as e:
+                self._wait_for_checkpoint(e.url)
+                continue
+            if valid:
+                self._fetch_username()
+                return
+            # cookies exist but Instagram doesn't accept them: log in again
+            self._wait_for_login_cookies()
 
     def _fetch_username(self):
         for path in (f"users/{self.user_id}/info/", "accounts/edit/web_form_data/"):
@@ -352,7 +361,7 @@ class InstagramWeb:
             raise LoginRequired()
         if msg in ("checkpoint_required", "challenge_required") or \
                 (isinstance(data, dict) and data.get("checkpoint_url")):
-            raise CheckpointRequired()
+            raise CheckpointRequired((data or {}).get("checkpoint_url"))
         if status == 429 or msg == "feedback_required" or "wait a few minutes" in msg or \
                 (isinstance(data, dict) and data.get("spam")):
             d = data if isinstance(data, dict) else {}
@@ -424,7 +433,15 @@ def run(ig, args, whitelist):
     print(f"Logged in as @{ig.username}" if ig.username else "Logged in")
     print()
 
-    following, followers = fetch_lists(ig)
+    while True:
+        try:
+            following, followers = fetch_lists(ig)
+            break
+        except CheckpointRequired as e:
+            ig._wait_for_checkpoint(e.url)
+        except LoginRequired:
+            print("Instagram logged you out. Please log in again in the browser window.")
+            ig.ensure_logged_in()
 
     targets = []
     for pk, u in following.items():
@@ -488,8 +505,8 @@ def run(ig, args, whitelist):
             print("Instagram logged you out. Please log in again in the browser window.")
             ig.ensure_logged_in()
             continue
-        except CheckpointRequired:
-            ig._wait_for_checkpoint()
+        except CheckpointRequired as e:
+            ig._wait_for_checkpoint(e.url)
             continue
         except BrowserClosed:
             raise
