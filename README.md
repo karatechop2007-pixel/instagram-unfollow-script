@@ -64,8 +64,11 @@ No script can promise Instagram won't notice, but this one is built to look like
   same cmd window, then try again.
 - **"Instagram is refusing connections from your network":** wait 15–30 minutes. VPNs and
   shared networks trigger this.
-- **Instagram asks you to confirm it's you:** do that in the browser window, then press
-  Enter in the terminal. The script picks up where it left off.
+- **Instagram shows a security check after login** (for example "Your email may not be
+  secure" or "Confirm it's you"): this is Instagram's new-device prompt, not a ban. It shows
+  up once because the script's browser profile is a new device to Instagram. Complete it in
+  the browser window, then press Enter in the terminal. The script picks up where it left off,
+  and the saved login means you won't see it again.
 - **Login stopped working:** delete the `browser_profile` folder and run again.
 - Instagram's terms don't officially allow automation. Using the default pace keeps the
   risk low, but it is never zero.
