@@ -1,5 +1,6 @@
-session.json
+browser_profile/
 not_following_back.txt
+session.json
 venv/
 __pycache__/
 .env

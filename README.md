@@ -1,7 +1,8 @@
 # Instagram unfollow script
 
 Unfollows everyone you follow on Instagram who doesn't follow you back.
-Runs on your own PC, no website or app needed.
+Runs on your own PC. It opens a real browser window (Chrome or Edge), you log in to
+Instagram there like normal, and the script does the rest from the terminal.
 
 ## Setup (once)
 
@@ -13,21 +14,21 @@ Runs on your own PC, no website or app needed.
 - **Windows:** double-click `run.bat`
 - **Mac / Linux:** open a terminal in the folder and run `./run.sh`
 
-The first time it installs what it needs, then asks for your Instagram username and password
-(the password isn't shown while typing). If you have two-factor auth on, it asks for the code.
-Your login is saved to `session.json` in the folder so you don't have to log in again next time.
+What happens:
 
-It then shows the list of accounts that don't follow you back and asks
-`Unfollow N account(s)? [y/N]`. Type `y` and it starts.
-
-### If the window flashes and closes
-
-Open the folder, click the address bar at the top of File Explorer, type `cmd` and press Enter.
-In the black window that opens type `run.bat` and press Enter. Now any error message stays on screen.
+1. First time only, it installs what it needs (about a minute).
+2. A browser window opens on Instagram's login page. **Log in there**, including any
+   two-factor code. The script waits for you. Your login is remembered in the
+   `browser_profile` folder, so next time it skips straight past this.
+3. It fetches who you follow and who follows you, then shows the list of accounts
+   that don't follow you back and asks `Unfollow N account(s)? [y/N]`.
+4. Type `y`. It unfollows one account every 30–40 seconds and keeps going until nobody
+   is left. Leave the browser window open (minimized is fine). Press Ctrl+C to stop any time.
 
 ## Options
 
-Run from a terminal with extra flags, for example `python unfollow.py --dry-run`:
+Run from a terminal with extra flags, for example `venv\Scripts\python unfollow.py --dry-run`
+(Windows) or `venv/bin/python unfollow.py --dry-run` (Mac/Linux):
 
 | Flag | What it does |
 |------|--------------|
@@ -39,16 +40,32 @@ Run from a terminal with extra flags, for example `python unfollow.py --dry-run`
 ## Keeping certain accounts
 
 Put usernames in `whitelist.txt`, one per line. Those are never unfollowed.
+The full list of who doesn't follow you back is also saved to `not_following_back.txt` each run.
 
-## Things to know
+## Staying out of trouble with Instagram
 
-- The script waits a random 30–40 seconds between each unfollow and keeps going until
-  nobody is left. For a few hundred accounts that's a few hours, so just leave it running.
-- If Instagram rate-limits you mid-run, the script waits 10 minutes (longer if it keeps happening)
-  and then carries on by itself. You don't need to do anything.
-- If it gets really stuck, Ctrl+C stops it. Running it again later picks up where it left off.
-- If Instagram asks you to confirm "it was me" in the app, do that, then run the script again.
-- If login stops working, delete `session.json` and run again.
-- Instagram's terms don't officially allow automation, so there's always some risk of a
-  temporary action block. Using the default delays keeps that risk low but not zero.
-- Your password is never stored. Only the session file is, so don't share `session.json`.
+No script can promise Instagram won't notice, but this one is built to look like a person:
+
+- It uses a real Chrome/Edge window on your own internet connection and your normal
+  logged-in session, and sends the exact same requests the Instagram website sends
+  when you click Unfollow. There is no fake app or fake phone involved.
+- It waits a random 30–40 seconds between unfollows, and only fetches your lists the
+  way the site does when you scroll them.
+- If Instagram does throw a temporary "try again later" block, the script waits 10 minutes
+  (longer if it keeps happening) and carries on by itself. These blocks are temporary,
+  not bans, and going slower is the only real fix. If you want to be extra careful,
+  run with `--max 150` once a day instead of all at once.
+
+## If something goes wrong
+
+- **The window flashes and closes:** open the folder, click the address bar in File Explorer,
+  type `cmd`, press Enter, then type `run.bat` and press Enter. The error stays on screen.
+- **"Could not start a browser":** run `venv\Scripts\playwright install chromium` in that
+  same cmd window, then try again.
+- **"Instagram is refusing connections from your network":** wait 15–30 minutes. VPNs and
+  shared networks trigger this.
+- **Instagram asks you to confirm it's you:** do that in the browser window, then press
+  Enter in the terminal. The script picks up where it left off.
+- **Login stopped working:** delete the `browser_profile` folder and run again.
+- Instagram's terms don't officially allow automation. Using the default pace keeps the
+  risk low, but it is never zero.
