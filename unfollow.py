@@ -7,7 +7,7 @@ Usage (after `pip install -r requirements.txt`):
     python unfollow.py               # shows the list, asks before unfollowing
     python unfollow.py --dry-run     # only shows the list, unfollows nobody
     python unfollow.py --yes         # skips the confirmation prompt
-    python unfollow.py --max 50      # unfollow at most 50 accounts this run
+    python unfollow.py --max 50      # optional: stop after 50 this run
 
 The first run asks for your username and password and saves a session to
 session.json so later runs don't need to log in again.
@@ -43,11 +43,14 @@ SESSION_FILE = HERE / "session.json"
 WHITELIST_FILE = HERE / "whitelist.txt"
 REPORT_FILE = HERE / "not_following_back.txt"
 
-# Delay between unfollows, in seconds. Instagram temporarily blocks accounts
-# that unfollow too fast, so keep these generous.
+# Random delay between each unfollow, in seconds.
 MIN_DELAY = 30
-MAX_DELAY = 90
-DEFAULT_MAX_PER_RUN = 100
+MAX_DELAY = 40
+
+# If Instagram rate-limits us, wait this long and then keep going.
+# Doubles on each repeat hit, up to the max.
+BACKOFF_START = 10 * 60
+BACKOFF_MAX = 2 * 60 * 60
 
 
 def load_whitelist() -> set:
@@ -115,8 +118,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Unfollow Instagram accounts that don't follow you back.")
     parser.add_argument("--dry-run", action="store_true", help="only list accounts, don't unfollow")
     parser.add_argument("--yes", "-y", action="store_true", help="don't ask for confirmation")
-    parser.add_argument("--max", type=int, default=DEFAULT_MAX_PER_RUN,
-                        help=f"max accounts to unfollow this run (default {DEFAULT_MAX_PER_RUN})")
+    parser.add_argument("--max", type=int, default=0,
+                        help="stop after this many unfollows (default: no limit, keeps going until done)")
     parser.add_argument("--keep-verified", action="store_true",
                         help="don't unfollow verified (blue check) accounts")
     args = parser.parse_args()
@@ -156,7 +159,7 @@ def main() -> int:
         print("\nDry run, nobody was unfollowed.")
         return 0
 
-    batch = targets[: args.max]
+    batch = targets[: args.max] if args.max > 0 else targets
     if len(batch) < len(targets):
         print(f"\nWill unfollow {len(batch)} of them this run (--max {args.max}). "
               f"Run the script again later for the rest.")
@@ -169,24 +172,33 @@ def main() -> int:
 
     est_minutes = len(batch) * (MIN_DELAY + MAX_DELAY) / 2 / 60
     print(f"\nStarting. Waiting {MIN_DELAY}-{MAX_DELAY}s between each unfollow, "
-          f"about {est_minutes:.0f} minutes total. Press Ctrl+C to stop any time.\n")
+          f"about {est_minutes:.0f} minutes total if Instagram doesn't slow us down. "
+          f"Press Ctrl+C to stop any time.\n")
 
     done = 0
+    backoff = BACKOFF_START
     try:
-        for i, u in enumerate(batch, 1):
+        i = 0
+        while i < len(batch):
+            u = batch[i]
             try:
                 ok = cl.user_unfollow(u.pk)
             except (PleaseWaitFewMinutes, RateLimitError, FeedbackRequired) as e:
                 print(f"\nInstagram is rate-limiting you ({e.__class__.__name__}). "
-                      f"Stopping now. Wait a few hours and run the script again.")
-                break
+                      f"Waiting {backoff // 60} minutes, then continuing...")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, BACKOFF_MAX)
+                continue  # retry the same account
             except LoginRequired:
                 print("\nSession expired. Delete session.json and run again.")
                 break
             except Exception as e:  # noqa: BLE001
-                print(f"[{i}/{len(batch)}] could not unfollow @{u.username}: {e}")
+                print(f"[{i + 1}/{len(batch)}] could not unfollow @{u.username}: {e}")
+                i += 1
                 continue
 
+            backoff = BACKOFF_START
+            i += 1
             if ok:
                 done += 1
                 print(f"[{i}/{len(batch)}] unfollowed @{u.username}")
