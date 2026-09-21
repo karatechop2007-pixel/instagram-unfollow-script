@@ -28,7 +28,7 @@ Run from a terminal with extra flags, for example `python unfollow.py --dry-run`
 |------|--------------|
 | `--dry-run` | Only shows the list, unfollows nobody |
 | `--yes` | Skips the confirmation question |
-| `--max 50` | Unfollow at most 50 this run (default 100) |
+| `--max 50` | Stop after 50 this run (default: no limit, runs until everyone is unfollowed) |
 | `--keep-verified` | Never unfollow blue-check accounts |
 
 ## Keeping certain accounts
@@ -37,10 +37,11 @@ Put usernames in `whitelist.txt`, one per line. Those are never unfollowed.
 
 ## Things to know
 
-- **Go slow.** Instagram blocks accounts that unfollow too fast. The script waits 30–90 seconds
-  between each unfollow and stops at 100 per run by default. If you follow a lot of people,
-  just run it again the next day.
-- If Instagram says it's rate-limiting you, the script stops on its own. Wait a few hours.
+- The script waits a random 30–40 seconds between each unfollow and keeps going until
+  nobody is left. For a few hundred accounts that's a few hours, so just leave it running.
+- If Instagram rate-limits you mid-run, the script waits 10 minutes (longer if it keeps happening)
+  and then carries on by itself. You don't need to do anything.
+- If it gets really stuck, Ctrl+C stops it. Running it again later picks up where it left off.
 - If Instagram asks you to confirm "it was me" in the app, do that, then run the script again.
 - If login stops working, delete `session.json` and run again.
 - Instagram's terms don't officially allow automation, so there's always some risk of a
